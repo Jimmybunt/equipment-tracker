@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Equipment Tracker</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg: #f5f4f0;
+    --surface: #ffffff;
+    --border: #d8d6ce;
+    --text: #1a1a18;
+    --muted: #6b6b65;
+    --accent-out: #c0392b;
+    --accent-in: #1d6a3a;
+    --accent-out-light: #fdf0ef;
+    --accent-in-light: #edf7f1;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 32px 24px;
+  }
+
+  .app {
+    max-width: 680px;
+    margin: 0 auto;
+  }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 32px;
+    gap: 16px;
+  }
+
+  .header-left h1 {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+    line-height: 1.2;
+  }
+
+  .header-left p {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 4px;
+    font-weight: 300;
+  }
+
+  .config-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 6px 12px;
+    cursor: pointer;
+    border-radius: 4px;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .config-btn:hover { border-color: var(--text); color: var(--text); }
+
+  /* Config panel */
+  .config-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 24px;
+    display: none;
+    box-shadow: var(--shadow);
+  }
+  .config-panel.open { display: block; }
+  .config-panel h3 {
+    font-family: var(--mono);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+  .config-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+  .config-field {
+    flex: 1;
+    min-width: 180px;
+  }
+  .config-field label {
+    display: block;
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--muted);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .config-field input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 13px;
+    background: var(--bg);
+    color: var(--text);
+    transition: border-color 0.15s;
+  }
+  .config-field input:focus { outline: none; border-color: var(--text); }
+  .config-save {
+    padding: 8px 16px;
+    background: var(--text);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 12px;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    white-space: nowrap;
+  }
+  .config-save:hover { opacity: 0.8; }
+  .config-note {
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.5;
+    padding: 10px;
+    background: var(--bg);
+    border-radius: 4px;
+    border-left: 3px solid var(--border);
+  }
+  .config-note code {
+    font-family: var(--mono);
+    background: var(--border);
+    padding: 1px 4px;
+    border-radius: 2px;
+    font-size: 11px;
+  }
+
+  /* Availability indicator */
+  .availability-card {
+    border-radius: 10px;
+    padding: 28px 28px 24px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+    position: relative;
+    overflow: hidden;
+    transition: background 0.4s, border-color 0.4s;
+    border: 1.5px solid transparent;
+  }
+  .availability-card.available {
+    background: var(--accent-in-light);
+    border-color: #a8d8b9;
+  }
+  .availability-card.in-use {
+    background: var(--accent-out-light);
+    border-color: #f0b8b3;
+  }
+
+  .avail-top {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  /* The big indicator dot */
+  .indicator-dot {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .indicator-dot::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    animation: pulse 2.2s ease-in-out infinite;
+  }
+  .available .indicator-dot {
+    background: var(--accent-in);
+    box-shadow: 0 0 0 0 rgba(29,106,58,0.4);
+  }
+  .available .indicator-dot::after {
+    box-shadow: 0 0 0 10px rgba(29,106,58,0);
+    animation: pulse-green 2.2s ease-in-out infinite;
+  }
+  .in-use .indicator-dot {
+    background: var(--accent-out);
+    box-shadow: 0 0 0 0 rgba(192,57,43,0.4);
+  }
+  .in-use .indicator-dot::after {
+    animation: none;
+  }
+
+  @keyframes pulse-green {
+    0%   { box-shadow: 0 0 0 0 rgba(29,106,58,0.45); }
+    70%  { box-shadow: 0 0 0 14px rgba(29,106,58,0); }
+    100% { box-shadow: 0 0 0 0 rgba(29,106,58,0); }
+  }
+
+  .avail-text h2 {
+    font-family: var(--mono);
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+    line-height: 1;
+    margin-bottom: 5px;
+    transition: color 0.3s;
+  }
+  .available .avail-text h2 { color: var(--accent-in); }
+  .in-use .avail-text h2 { color: var(--accent-out); }
+
+  .avail-text p {
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.4;
+  }
+  .available .avail-text p { color: #2e7d52; }
+  .in-use .avail-text p { color: #922b21; }
+
+  .avail-divider {
+    height: 1px;
+    margin: 0 -28px;
+    transition: background 0.4s;
+  }
+  .available .avail-divider { background: #b8ddc7; }
+  .in-use .avail-divider { background: #f0b8b3; }
+
+  .avail-meta {
+    display: flex;
+    gap: 24px;
+    padding-top: 16px;
+    flex-wrap: wrap;
+  }
+
+  .meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .meta-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    opacity: 0.6;
+  }
+  .meta-value {
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .available .meta-label, .available .meta-value { color: #1d6a3a; }
+  .in-use .meta-label, .in-use .meta-value { color: #922b21; }
+
+  /* Status card (kept for legacy, now hidden) */
+  .status-card { display: none; }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .badge.out { background: var(--accent-out-light); color: var(--accent-out); }
+  .badge.in { background: var(--accent-in-light); color: var(--accent-in); }
+  .badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  /* Action form */
+  .action-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+  }
+
+  .action-card h3 {
+    font-family: var(--mono);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+
+  .form-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+  }
+
+  .form-field {
+    flex: 1;
+  }
+  .form-field label {
+    display: block;
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--muted);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .form-field input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: var(--sans);
+    font-size: 14px;
+    background: var(--bg);
+    color: var(--text);
+    transition: border-color 0.15s;
+  }
+  .form-field input:focus { outline: none; border-color: var(--text); }
+  .form-field input::placeholder { color: #bbb; }
+
+  .action-btn {
+    padding: 10px 22px;
+    border: none;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+    min-width: 130px;
+    text-align: center;
+  }
+  .action-btn.checkout { background: var(--accent-out); color: white; }
+  .action-btn.checkout:hover { background: #a93226; }
+  .action-btn.checkin { background: var(--accent-in); color: white; }
+  .action-btn.checkin:hover { background: #155a2f; }
+  .action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Message */
+  .msg {
+    padding: 10px 14px;
+    border-radius: 4px;
+    font-size: 13px;
+    margin-top: 12px;
+    display: none;
+  }
+  .msg.error { background: var(--accent-out-light); color: var(--accent-out); border: 1px solid #f0b8b3; }
+  .msg.success { background: var(--accent-in-light); color: var(--accent-in); border: 1px solid #b3d9c0; }
+  .msg.info { background: #eef3fb; color: #2c5aa0; border: 1px solid #c0d4f0; }
+  .msg.visible { display: block; }
+
+  /* Log */
+  .log-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+
+  .log-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .log-header h3 {
+    font-family: var(--mono);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+  }
+  .log-count {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .log-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .log-table th {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--muted);
+    text-align: left;
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    font-weight: 400;
+  }
+  .log-table td {
+    padding: 12px 20px;
+    font-size: 13px;
+    border-bottom: 1px solid #f0ede8;
+    vertical-align: middle;
+  }
+  .log-table tr:last-child td { border-bottom: none; }
+  .log-table tr:hover td { background: #faf9f7; }
+
+  .log-type {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .log-type.out { color: var(--accent-out); }
+  .log-type.in { color: var(--accent-in); }
+
+  .log-name { font-weight: 500; }
+  .log-date { color: var(--muted); font-family: var(--mono); font-size: 12px; }
+  .log-notes { color: var(--muted); font-size: 12px; max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .empty-log {
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 300;
+  }
+
+  .loading-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(245,244,240,0.6);
+    backdrop-filter: blur(2px);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+  .loading-overlay.visible { display: flex; }
+  .loading-spinner {
+    width: 32px; height: 32px;
+    border: 2px solid var(--border);
+    border-top-color: var(--text);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Demo mode banner */
+  .demo-banner {
+    background: #fff9e6;
+    border: 1px solid #f5d87a;
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: #7a5c00;
+    margin-bottom: 20px;
+    font-family: var(--mono);
+    display: none;
+  }
+  .demo-banner.visible { display: block; }
+</style>
+</head>
+<body>
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+</div>
+
+<div class="app">
+  <header>
+    <div class="header-left">
+      <h1>Equipment Tracker</h1>
+      <p id="equipmentLabel">Engineers Toolkit</p>
+    </div>
+    <button class="config-btn" onclick="toggleConfig()">Configure</button>
+  </header>
+
+  <!-- Config Panel -->
+  <div class="config-panel" id="configPanel">
+    <h3>SharePoint Settings</h3>
+    <div class="config-row">
+      <div class="config-field">
+        <label>Site URL</label>
+        <input type="text" id="cfgSiteUrl" placeholder="https://yourcompany.sharepoint.com/sites/it" />
+      </div>
+      <div class="config-field">
+        <label>List Name</label>
+        <input type="text" id="cfgListName" placeholder="EquipmentTracker" />
+      </div>
+      <div class="config-field" style="min-width:140px;max-width:200px;">
+        <label>Equipment Name</label>
+        <input type="text" id="cfgEquipName" placeholder="Engineers Toolkit" />
+      </div>
+      <button class="config-save" onclick="saveConfig()">Save</button>
+    </div>
+    <div class="config-note">
+      <strong>One-time setup:</strong> Create a SharePoint list named <code>EquipmentTracker</code> with these columns:
+      <code>Title</code> (single line), <code>CheckedOutBy</code> (single line), <code>ActionType</code> (single line),
+      <code>ActionDate</code> (date/time), <code>Notes</code> (single line), <code>Equipment</code> (single line).
+      Then enter your SharePoint site URL above and save. When hosted in SharePoint, authentication is automatic.
+    </div>
+  </div>
+
+  <!-- Demo mode banner -->
+  <div class="demo-banner" id="demoBanner">
+    DEMO MODE: No SharePoint list configured. Data is stored locally only and will not persist between sessions.
+  </div>
+
+  <!-- Availability Indicator -->
+  <div class="availability-card" id="availCard">
+    <div class="avail-top">
+      <div class="indicator-dot" id="indicatorDot"></div>
+      <div class="avail-text">
+        <h2 id="availHeadline">Loading...</h2>
+        <p id="availSubline"></p>
+      </div>
+    </div>
+    <div class="avail-divider"></div>
+    <div class="avail-meta" id="availMeta"></div>
+  </div>
+
+  <!-- Action Card -->
+  <div class="action-card" id="actionCard">
+    <h3 id="actionTitle">Action</h3>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Your Name</label>
+        <input type="text" id="inputName" placeholder="e.g. James" />
+      </div>
+      <div class="form-field">
+        <label>Notes (optional)</label>
+        <input type="text" id="inputNotes" placeholder="e.g. taking to site visit" />
+      </div>
+      <button class="action-btn" id="actionBtn" onclick="doAction()">Check Out</button>
+    </div>
+    <div class="msg" id="msgBox"></div>
+  </div>
+
+  <!-- Log -->
+  <div class="log-card">
+    <div class="log-header">
+      <h3>History</h3>
+      <span class="log-count" id="logCount"></span>
+    </div>
+    <div id="logBody">
+      <div class="empty-log">No records yet.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// CONFIG
+// ============================================================
+const STORAGE_KEY = 'eq_tracker_config';
+const DEMO_STORAGE_KEY = 'eq_tracker_demo_data';
+
+let cfg = {
+  siteUrl: '',
+  listName: 'EquipmentTracker',
+  equipmentName: 'Engineers Toolkit'
+};
+
+let currentStatus = null; // null = available, object = checked out record
+let demoMode = false;
+let demoData = [];
+
+function loadConfig() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) cfg = { ...cfg, ...JSON.parse(saved) };
+  } catch(e) {}
+  document.getElementById('cfgSiteUrl').value = cfg.siteUrl;
+  document.getElementById('cfgListName').value = cfg.listName;
+  document.getElementById('cfgEquipName').value = cfg.equipmentName;
+  document.getElementById('equipmentLabel').textContent = cfg.equipmentName;
+}
+
+function saveConfig() {
+  cfg.siteUrl = document.getElementById('cfgSiteUrl').value.trim().replace(/\/$/, '');
+  cfg.listName = document.getElementById('cfgListName').value.trim() || 'EquipmentTracker';
+  cfg.equipmentName = document.getElementById('cfgEquipName').value.trim() || 'Engineers Toolkit';
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
+  document.getElementById('equipmentLabel').textContent = cfg.equipmentName;
+  document.getElementById('configPanel').classList.remove('open');
+  init();
+}
+
+function toggleConfig() {
+  document.getElementById('configPanel').classList.toggle('open');
+}
+
+// ============================================================
+// SHAREPOINT API
+// ============================================================
+function spHeaders() {
+  return {
+    'Accept': 'application/json;odata=nometadata',
+    'Content-Type': 'application/json;odata=nometadata'
+  };
+}
+
+function spUrl(path) {
+  const base = cfg.siteUrl || window.location.origin;
+  return `${base}/_api/web/lists/GetByTitle('${cfg.listName}')${path}`;
+}
+
+async function spGetDigest() {
+  const res = await fetch((cfg.siteUrl || '') + '/_api/contextinfo', {
+    method: 'POST',
+    headers: { 'Accept': 'application/json;odata=nometadata' },
+    credentials: 'include'
+  });
+  const d = await res.json();
+  return d.FormDigestValue;
+}
+
+async function fetchItems() {
+  const url = spUrl(`/items?$filter=Equipment eq '${encodeURIComponent(cfg.equipmentName)}'&$orderby=ActionDate desc&$top=50`);
+  const res = await fetch(url, { headers: spHeaders(), credentials: 'include' });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const d = await res.json();
+  return d.value || [];
+}
+
+async function addItem(data) {
+  const digest = await spGetDigest();
+  const res = await fetch(spUrl('/items'), {
+    method: 'POST',
+    headers: { ...spHeaders(), 'X-RequestDigest': digest },
+    credentials: 'include',
+    body: JSON.stringify({
+      Title: `${data.actionType} - ${data.checkedOutBy}`,
+      CheckedOutBy: data.checkedOutBy,
+      ActionType: data.actionType,
+      ActionDate: new Date().toISOString(),
+      Notes: data.notes || '',
+      Equipment: cfg.equipmentName
+    })
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err);
+  }
+  return await res.json();
+}
+
+// ============================================================
+// DEMO MODE (localStorage fallback)
+// ============================================================
+function loadDemoData() {
+  try {
+    const s = localStorage.getItem(DEMO_STORAGE_KEY);
+    if (s) demoData = JSON.parse(s);
+  } catch(e) { demoData = []; }
+}
+
+function saveDemoData() {
+  localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(demoData));
+}
+
+function addDemoItem(data) {
+  const item = {
+    ID: Date.now(),
+    Title: `${data.actionType} - ${data.checkedOutBy}`,
+    CheckedOutBy: data.checkedOutBy,
+    ActionType: data.actionType,
+    ActionDate: new Date().toISOString(),
+    Notes: data.notes || '',
+    Equipment: cfg.equipmentName
+  };
+  demoData.unshift(item);
+  saveDemoData();
+  return item;
+}
+
+// ============================================================
+// UI
+// ============================================================
+function setLoading(on) {
+  document.getElementById('loadingOverlay').classList.toggle('visible', on);
+}
+
+function showMsg(type, text) {
+  const el = document.getElementById('msgBox');
+  el.className = `msg ${type} visible`;
+  el.textContent = text;
+  setTimeout(() => el.classList.remove('visible'), 5000);
+}
+
+function renderStatus(items) {
+  const latest = items[0];
+  const isOut = latest && latest.ActionType === 'CHECK_OUT';
+  currentStatus = isOut ? latest : null;
+
+  const card = document.getElementById('availCard');
+  const headline = document.getElementById('availHeadline');
+  const subline = document.getElementById('availSubline');
+  const meta = document.getElementById('availMeta');
+  const actionTitle = document.getElementById('actionTitle');
+  const actionBtn = document.getElementById('actionBtn');
+
+  if (isOut) {
+    card.className = 'availability-card in-use';
+    headline.textContent = 'In Use';
+    subline.textContent = `Currently checked out by ${latest.CheckedOutBy}`;
+    const d = new Date(latest.ActionDate);
+    meta.innerHTML = `
+      <div class="meta-item"><span class="meta-label">Checked out by</span><span class="meta-value">${escHtml(latest.CheckedOutBy)}</span></div>
+      <div class="meta-item"><span class="meta-label">Since</span><span class="meta-value">${formatDate(d)}</span></div>
+      <div class="meta-item"><span class="meta-label">Duration</span><span class="meta-value">${timeAgo(d)}</span></div>
+      ${latest.Notes ? `<div class="meta-item"><span class="meta-label">Notes</span><span class="meta-value">${escHtml(latest.Notes)}</span></div>` : ''}
+    `;
+    actionTitle.textContent = 'Return Equipment';
+    actionBtn.textContent = 'Check In';
+    actionBtn.className = 'action-btn checkin';
+  } else {
+    card.className = 'availability-card available';
+    headline.textContent = 'Available';
+    subline.textContent = 'The Engineers Toolkit is ready to use';
+    if (latest) {
+      const d = new Date(latest.ActionDate);
+      meta.innerHTML = `
+        <div class="meta-item"><span class="meta-label">Last used by</span><span class="meta-value">${escHtml(latest.CheckedOutBy)}</span></div>
+        <div class="meta-item"><span class="meta-label">Returned</span><span class="meta-value">${formatDate(d)}</span></div>
+      `;
+    } else {
+      meta.innerHTML = `<div class="meta-item"><span class="meta-label">Status</span><span class="meta-value">No records yet</span></div>`;
+    }
+    actionTitle.textContent = 'Take Equipment';
+    actionBtn.textContent = 'Check Out';
+    actionBtn.className = 'action-btn checkout';
+  }
+}
+
+function renderLog(items) {
+  const body = document.getElementById('logBody');
+  const count = document.getElementById('logCount');
+  count.textContent = items.length ? `${items.length} record${items.length !== 1 ? 's' : ''}` : '';
+
+  if (!items.length) {
+    body.innerHTML = '<div class="empty-log">No records yet.</div>';
+    return;
+  }
+
+  const rows = items.map(item => {
+    const isOut = item.ActionType === 'CHECK_OUT';
+    const d = new Date(item.ActionDate);
+    return `<tr>
+      <td><span class="log-type ${isOut ? 'out' : 'in'}">${isOut ? 'Out' : 'In'}</span></td>
+      <td class="log-name">${escHtml(item.CheckedOutBy)}</td>
+      <td class="log-date">${formatDate(d)}</td>
+      <td class="log-notes">${escHtml(item.Notes || '')}</td>
+    </tr>`;
+  }).join('');
+
+  body.innerHTML = `<table class="log-table">
+    <thead><tr>
+      <th>Type</th><th>Name</th><th>Date/Time</th><th>Notes</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function timeAgo(date) {
+  const s = Math.floor((Date.now() - date) / 1000);
+  if (s < 60) return 'just now';
+  if (s < 3600) return `${Math.floor(s/60)}m ago`;
+  if (s < 86400) return `${Math.floor(s/3600)}h ago`;
+  return `${Math.floor(s/86400)}d ago`;
+}
+
+function formatDate(d) {
+  return d.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' })
+    + ' ' + d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+}
+
+function escHtml(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ============================================================
+// ACTIONS
+// ============================================================
+async function doAction() {
+  const name = document.getElementById('inputName').value.trim();
+  const notes = document.getElementById('inputNotes').value.trim();
+  if (!name) { showMsg('error', 'Please enter your name.'); return; }
+
+  const isOut = !currentStatus;
+  const actionType = isOut ? 'CHECK_OUT' : 'CHECK_IN';
+
+  document.getElementById('actionBtn').disabled = true;
+  setLoading(true);
+
+  try {
+    if (demoMode) {
+      addDemoItem({ actionType, checkedOutBy: name, notes });
+      renderStatus(demoData);
+      renderLog(demoData);
+    } else {
+      await addItem({ actionType, checkedOutBy: name, notes });
+      const items = await fetchItems();
+      renderStatus(items);
+      renderLog(items);
+    }
+    document.getElementById('inputName').value = '';
+    document.getElementById('inputNotes').value = '';
+    showMsg('success', isOut ? `Checked out to ${name}.` : `Checked in by ${name}. Thanks!`);
+  } catch(e) {
+    showMsg('error', 'Something went wrong: ' + e.message);
+    console.error(e);
+  } finally {
+    document.getElementById('actionBtn').disabled = false;
+    setLoading(false);
+  }
+}
+
+// ============================================================
+// INIT
+// ============================================================
+async function init() {
+  setLoading(true);
+  document.getElementById('demoBanner').classList.remove('visible');
+
+  if (!cfg.siteUrl) {
+    // Demo mode
+    demoMode = true;
+    loadDemoData();
+    document.getElementById('demoBanner').classList.add('visible');
+    renderStatus(demoData);
+    renderLog(demoData);
+    setLoading(false);
+    return;
+  }
+
+  demoMode = false;
+  try {
+    const items = await fetchItems();
+    renderStatus(items);
+    renderLog(items);
+  } catch(e) {
+    // Fall back to demo if SP call fails
+    demoMode = true;
+    loadDemoData();
+    document.getElementById('demoBanner').classList.add('visible');
+    showMsg('error', 'Could not connect to SharePoint list. Running in demo mode. Check your configuration.');
+    renderStatus(demoData);
+    renderLog(demoData);
+  } finally {
+    setLoading(false);
+  }
+}
+
+loadConfig();
+init();
+</script>
+</body>
+</html>
